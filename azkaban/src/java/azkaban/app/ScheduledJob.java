@@ -21,11 +21,10 @@ import org.joda.time.Duration;
 import org.joda.time.ReadablePeriod;
 
 import azkaban.common.utils.Utils;
+import azkaban.flow.ExecutableFlow;
 
 /**
  * A Job instance decorated with schedule information.
- * 
- * ScheduledJobs are Runnable so they can be feed directly into a thread pool
  * 
  * TODO: We should be able to merge this with JobExecution
  * 
@@ -42,6 +41,7 @@ public class ScheduledJob {
     private volatile DateTime _ended;
     private volatile boolean _invalid = false;
     private volatile Runnable _runnable = null;
+    private volatile ExecutableFlow _flow = null;
 
     public ScheduledJob(String jobName,
                         JobManager jobManager,
@@ -109,6 +109,14 @@ public class ScheduledJob {
 
     public Runnable getScheduledRunnable() {
         return _runnable;
+    }
+
+    public void setExecutableFlow(ExecutableFlow flow) {
+        _flow = flow;
+    }
+
+    public ExecutableFlow getExecutableFlow() {
+        return _flow;
     }
 
     public void markInvalid() {

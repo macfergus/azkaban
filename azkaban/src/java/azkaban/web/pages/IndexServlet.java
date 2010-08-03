@@ -37,7 +37,7 @@ import org.joda.time.ReadablePeriod;
 import org.joda.time.Seconds;
 
 import azkaban.app.JobDescriptor;
-import azkaban.app.Scheduler.ScheduledJobAndInstance;
+import azkaban.app.ScheduledJob;
 import azkaban.web.AbstractAzkabanServlet;
 
 import azkaban.common.web.Page;
@@ -90,8 +90,8 @@ public class IndexServlet extends AbstractAzkabanServlet {
 
     private void cancelJob(AzkabanApplication app, HttpServletRequest req) throws ServletException {
         String jobId = getParam(req, "job");
-        Collection<ScheduledJobAndInstance> executing = app.getScheduler().getExecutingJobs();
-        for(ScheduledJobAndInstance curr: executing) {
+        Collection<ScheduledJob> executing = app.getScheduler().getExecutingJobs();
+        for(ScheduledJob curr: executing) {
             ExecutableFlow flow = curr.getExecutableFlow();
             final String flowId = flow.getId();
             if(flowId.equals(jobId)) {

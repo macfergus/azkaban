@@ -67,8 +67,8 @@ public class Scheduler
 
     private final JobManager _jobManager;
     private final Mailman _mailman;
-    private final Map<String, ScheduledJob> _scheduled;
-    private final Map<String, ScheduledJobAndInstance> _executing;
+    private final Multimap<String, ScheduledJob> _scheduled;
+    private final Multimap<String, ScheduledJob> _executing;
     private final Multimap<String, ScheduledJob> _completed;
     private final DateTimeFormatter _dateFormat = DateTimeFormat.forPattern("MM-dd-yyyy HH:mm:ss:SSS");
     private final ClassLoader _baseClassLoader;
@@ -93,15 +93,14 @@ public class Scheduler
                      int numThreads)
     {
         this.allKnownFlows = allKnownFlows;
-        Multimap<String, ScheduledJob> typedMultiMap = HashMultimap.create();
 
         _scheduleFile = scheduleFile;
         _scheduleBackupFile = backupScheduleFile;
         _jobManager = Utils.nonNull(jobManager);
         _mailman = mailman;
-        _completed = Multimaps.synchronizedMultimap(typedMultiMap);
-        _scheduled = new ConcurrentHashMap<String, ScheduledJob>();
-        _executing = new ConcurrentHashMap<String, ScheduledJobAndInstance>();
+        _completed = Multimaps.synchronizedMultimap(HashMultimap.<String, ScheduledJob>create());
+        _scheduled = Multimaps.synchronizedMultimap(HashMultimap.<String, ScheduledJob>create());
+        _executing = Multimaps.synchronizedMultimap(HashMultimap.<String, ScheduledJob>create());
         _baseClassLoader = classLoader;
         _jobSuccessEmail = jobSuccessEmail;
         _jobFailureEmail = jobFailureEmail;
@@ -193,19 +192,13 @@ public class Scheduler
     }
 
     /**
-     * Schedule this flow to run one time at the specified date
+     * Schedule this flow to run one time now.
      *
      * @param flow The ExecutableFlow to run
      */
     public ScheduledFuture<?> scheduleNow(ExecutableFlow flow)
     {
         logger.info("Scheduling job '" + flow.getName() + "' for now");
-
-        ScheduledJob oldScheduledJob = _scheduled.get(flow.getName());
-        // Invalidate any old scheduled job of the same name.
-        if (oldScheduledJob != null) {
-            throw new RuntimeException("Schedule for flow already exists " + flow.getName());
-        }
 
         final ScheduledJob schedJob = new ScheduledJob(flow.getName(), _jobManager, new DateTime(), true);
 
@@ -267,12 +260,6 @@ public class Scheduler
     {
         // fail fast if there is a problem with this job
         _jobManager.validateJob(schedJob.getId());
-
-        ScheduledJob oldScheduledJob = _scheduled.get(schedJob.getId());
-        // Invalidate any old scheduled job of the same name.
-        if (oldScheduledJob != null) {
-            throw new RuntimeException("Schedule for job already exists " + schedJob.getId());
-        }
 
         Duration wait = new Duration(new DateTime(), schedJob.getScheduledExecution());
         if (wait.getMillis() < -1000) {
@@ -466,31 +453,12 @@ public class Scheduler
         }
     }
 
-    public void cancel(String name) throws Exception
-    {
-        ScheduledJobAndInstance instance = _executing.get(name);
-        if (instance == null) {
-            throw new IllegalArgumentException("'" + name + "' is not currently running.");
-        }
-        instance.getExecutableFlow().cancel();
-    }
-
-    public boolean isScheduled(String name)
-    {
-        return _scheduled.containsKey(name);
-    }
-
     public Collection<ScheduledJob> getScheduledJobs()
     {
         return _scheduled.values();
     }
 
-    public boolean isExecuting(String name)
-    {
-        return _executing.containsKey(name);
-    }
-
-    public Collection<ScheduledJobAndInstance> getExecutingJobs()
+    public Collection<ScheduledJob> getExecutingJobs()
     {
         return _executing.values();
     }
@@ -502,6 +470,11 @@ public class Scheduler
 
     public boolean unschedule(String name)
     {
+        // REIMPLEMENT
+        // We have to unschedule a name and a time
+        return true;
+
+        /*
         ScheduledJob job = _scheduled.remove(name);
         if (job != null) {
             job.markInvalid();
@@ -516,6 +489,7 @@ public class Scheduler
         }
 
         return job != null;
+        */
     }
 
     /**
@@ -534,6 +508,7 @@ public class Scheduler
         }
     }
 
+    /*
     public class ScheduledJobAndInstance
     {
         private final ExecutableFlow flow;
@@ -555,6 +530,7 @@ public class Scheduler
             return _scheduledJob;
         }
     }
+    */
 
     /**
      * A runnable adapter for a Job
@@ -597,9 +573,10 @@ public class Scheduler
                 final String senderEmail = senderAddress;
                 
                 // mark the job as executing
-                _scheduled.remove(_scheduledJob.getId());
+                _scheduled.remove(_scheduledJob.getId(), _scheduledJob);
                 _scheduledJob.setStarted(new DateTime());
-                _executing.put(flowToRun.getName(), new ScheduledJobAndInstance(flowToRun, _scheduledJob));
+                _scheduledJob.setExecutableFlow(flowToRun);
+                _executing.put(flowToRun.getName(), _scheduledJob);
                 flowToRun.execute(new FlowCallback()
                 {
                     @Override
@@ -632,7 +609,7 @@ public class Scheduler
                         }
                         finally {
                             // mark the job as completed
-                            _executing.remove(_scheduledJob.getId());
+                            _executing.remove(_scheduledJob.getId(), _scheduledJob);
                             _completed.put(_scheduledJob.getId(), _scheduledJob);
 
                             // if this is a recurring job, schedule the next execution as well
@@ -662,8 +639,8 @@ public class Scheduler
                 if (emailList != null) {
                     sendErrorEmail(_scheduledJob, t, senderAddress, emailList);
                 }
-                _scheduled.remove(_scheduledJob.getId());
-                _executing.remove(_scheduledJob.getId());
+                _scheduled.remove(_scheduledJob.getId(), _scheduledJob);
+                _executing.remove(_scheduledJob.getId(), _scheduledJob);
                 logger.warn(String.format("An exception almost made it back to the ScheduledThreadPool from job[%s]", _scheduledJob), t);
             }
         }
@@ -701,9 +678,10 @@ public class Scheduler
                 final String senderEmail = senderAddress;
                 
                 // mark the job as executing
-                _scheduled.remove(_scheduledJob.getId());
+                _scheduled.remove(_scheduledJob.getId(), _scheduledJob);
                 _scheduledJob.setStarted(new DateTime());
-                _executing.put(_flow.getName(), new ScheduledJobAndInstance(_flow, _scheduledJob));
+                _scheduledJob.setExecutableFlow(_flow);
+                _executing.put(_flow.getName(), _scheduledJob);
                 _flow.execute(new FlowCallback()
                 {
                     @Override
@@ -736,7 +714,7 @@ public class Scheduler
                         }
                         finally {
                             // mark the job as completed
-                            _executing.remove(_scheduledJob.getId());
+                            _executing.remove(_scheduledJob.getId(), _scheduledJob);
                             _completed.put(_scheduledJob.getId(), _scheduledJob);
                         }
                     }
@@ -748,8 +726,8 @@ public class Scheduler
                 if (emailList != null) {
                     sendErrorEmail(_scheduledJob, t, senderAddress, emailList);
                 }
-                _scheduled.remove(_scheduledJob.getId());
-                _executing.remove(_scheduledJob.getId());
+                _scheduled.remove(_scheduledJob.getId(), _scheduledJob);
+                _executing.remove(_scheduledJob.getId(), _scheduledJob);
                 logger.warn(String.format("An exception almost made it back to the ScheduledThreadPool from job[%s]", _scheduledJob), t);
             }
         }

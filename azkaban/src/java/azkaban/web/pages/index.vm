@@ -106,7 +106,7 @@
           <tr>
             <td>
                 <ul id="execing-jobs-tree-${rowCount}" class="execing-jobs">
-                  #execing_job($exec.executableFlow)
+                  #execing_job($exec.getExecutableFlow())
                 </ul>
             </td>
             <td>
