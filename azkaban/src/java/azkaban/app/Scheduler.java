@@ -20,6 +20,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
@@ -151,22 +152,24 @@ public class Scheduler
 
     private ScheduledJob parseScheduledJob(String name, String job)
     {
-        String[] pieces = job.split("\\s+");
-
-        if (pieces.length != 3) {
+        // name contains the job name and the time it's scheduled to run
+        String[] namePieces = name.split("\\s+");
+        String[] jobPieces = job.split("\\s+");
+        if (namePieces.length != 2 || jobPieces.length != 2) {
             logger.warn("Error loading schedule from file " + name);
             return null;
         }
 
-        DateTime time = FILE_DATEFORMAT.parseDateTime(pieces[0]);
-        ReadablePeriod period = parsePeriodString(name, pieces[1]);
-        Boolean dependency = Boolean.parseBoolean(pieces[2]);
+        String jobname = namePieces[0];
+        DateTime time = FILE_DATEFORMAT.parseDateTime(namePieces[1]);
+        ReadablePeriod period = parsePeriodString(name, jobPieces[0]);
+        Boolean dependency = Boolean.parseBoolean(jobPieces[1]);
         if (dependency == null) {
             dependency = false;
         }
         if (period == null) {
             if (time.isAfterNow()) {
-                return new ScheduledJob(name, time, period, dependency);
+                return new ScheduledJob(jobname, time, period, dependency);
             }
             else {
                 logger.warn("Non recurring job scheduled in past. Will not reschedule " + name);
@@ -176,7 +179,7 @@ public class Scheduler
 
         // Update the time with the period.
         DateTime date = updatedTime(time, period);
-        return new ScheduledJob(name, date, period, dependency);
+        return new ScheduledJob(jobname, date, period, dependency);
     }
 
     /**
@@ -342,7 +345,7 @@ public class Scheduler
 
             String dependency = String.valueOf(job.isDependencyIgnored());
 
-            props.put(name, nextScheduledStr + " " + periodStr + " " + dependency);
+            props.put(name + " " + nextScheduledStr, periodStr + " " + dependency);
         }
 
         return props;
@@ -453,14 +456,31 @@ public class Scheduler
         }
     }
 
+    /*
+     * getScheduledJobs() and getExecutingJobs() are implemented this way 
+     * because of the warnings here:
+     * 
+     * http://google-collections.googlecode.com/svn/trunk/javadoc/com/google/common/collect/Multimaps.html#synchronizedMultimap(com.google.common.collect.Multimap)
+     * 
+     * The client shouldn't have to deal with synchronization.
+     */
+
     public Collection<ScheduledJob> getScheduledJobs()
     {
-        return _scheduled.values();
+        ArrayList<ScheduledJob> scheduledJobs = null;
+        synchronized (_scheduled) {
+            scheduledJobs = new ArrayList<ScheduledJob>(_scheduled.values());
+        }
+        return scheduledJobs;
     }
 
     public Collection<ScheduledJob> getExecutingJobs()
     {
-        return _executing.values();
+        ArrayList<ScheduledJob> executingJobs = null;
+        synchronized (_executing) {
+            executingJobs = new ArrayList<ScheduledJob>(_executing.values());
+        }
+        return executingJobs;
     }
 
     public Multimap<String, ScheduledJob> getCompleted()
