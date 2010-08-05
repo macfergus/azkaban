@@ -81,7 +81,8 @@
             <td>
               <form action="${context}/" method="post" style="display: inline">
                 <input type="hidden" name="action" value="unschedule"/>
-                <input type="hidden" name="job" value="${sched.id}"/>     
+                <input type="hidden" name="job" value="${sched.id}"/>
+                <input type="hidden" name="scheduled_execution" value="$utils.isoFormatDateTime($sched.scheduledExecution)">
                 <input type="submit" value="Remove" />      
               </form>
             </td>

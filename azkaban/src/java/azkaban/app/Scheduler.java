@@ -44,6 +44,7 @@ import org.joda.time.ReadablePeriod;
 import org.joda.time.Seconds;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
 import org.joda.time.format.PeriodFormat;
 
 import azkaban.common.utils.Props;
@@ -488,14 +489,29 @@ public class Scheduler
         return _completed;
     }
 
-    public boolean unschedule(String name)
-    {
-        // REIMPLEMENT
-        // We have to unschedule a name and a time
-        return true;
+    public boolean unschedule(String name, String scheduledExecutionString) {
+        return unschedule(name, scheduledExecutionString, ISODateTimeFormat.dateTime());
+    }
 
-        /*
-        ScheduledJob job = _scheduled.remove(name);
+    public boolean unschedule(String name, String scheduledExecutionString, DateTimeFormatter f) {
+        DateTime scheduledExecution = f.parseDateTime(scheduledExecutionString);
+        return unschedule(name, scheduledExecution);
+    }
+
+    public boolean unschedule(String name, DateTime scheduledExecution)
+    {
+        Collection<ScheduledJob> scheduledJobs = _scheduled.get(name);
+        ScheduledJob job = null;
+        synchronized (scheduledJobs) {
+            for (ScheduledJob scheduledJob : scheduledJobs) {
+                if (scheduledJob.getScheduledExecution().equals(scheduledExecution)) {
+                    job = scheduledJob;
+                    break;
+                }
+            }
+        }
+
+        _scheduled.remove(name, job);
         if (job != null) {
             job.markInvalid();
             Runnable runnable = job.getScheduledRunnable();
@@ -509,7 +525,6 @@ public class Scheduler
         }
 
         return job != null;
-        */
     }
 
     /**

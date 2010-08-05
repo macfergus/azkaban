@@ -32,6 +32,7 @@ import org.joda.time.Period;
 import org.joda.time.ReadablePeriod;
 import org.joda.time.format.DateTimeFormat;
 import org.joda.time.format.DateTimeFormatter;
+import org.joda.time.format.ISODateTimeFormat;
 import org.joda.time.format.PeriodFormatter;
 import org.joda.time.format.PeriodFormatterBuilder;
 
@@ -72,6 +73,11 @@ public class GuiUtils {
 
     public String formatDateTime(DateTime date) {
         return formatDate(date, "MM-dd-yyyy HH:mm:ss");
+    }
+
+    public String isoFormatDateTime(DateTime date) {
+        DateTimeFormatter f = ISODateTimeFormat.dateTime();
+        return f.print(date);
     }
 
     public String formatDate(DateTime date, String format) {

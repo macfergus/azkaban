@@ -134,10 +134,14 @@ public class ProcessJob extends AbstractJob implements Job {
 
         // We're leaking fd's if we don't close these streams. destroy() might also close
         // them, but I'm unsure so we close them manually just to be safe.
-        close(_process.getInputStream());
-        close(_process.getOutputStream());
-        close(_process.getErrorStream());
-        _process.destroy();
+        try {
+            _process.getInputStream().close();
+            _process.getOutputStream().close();
+            _process.getErrorStream().close();
+            _process.destroy();
+        } catch (IOException e) {
+        }
+        
     }
 
     private File createFlattenedPropsFile(String workingDir, final Props props, final String id) {
