@@ -90,27 +90,19 @@ public class IndexServlet extends AbstractAzkabanServlet {
     }
 
     private void cancelJob(AzkabanApplication app, HttpServletRequest req) throws ServletException {
-        String jobId = getParam(req, "job");
-        Collection<ScheduledJob> executing = app.getScheduler().getExecutingJobs();
-        for(ScheduledJob curr: executing) {
-            ExecutableFlow flow = curr.getExecutableFlow();
-            final String flowId = flow.getId();
-            if(flowId.equals(jobId)) {
-                final String flowName = flow.getName();
-                try {
-                    if (flow.cancel()) {
-                        addMessage(req, "Cancelled " + flowName);
-                        logger.info("Job '" + flowName + "' cancelled from gui.");
-                    }
-                    else {
-                        logger.info("Couldn't cancel flow '" + flowName + "' for some reason.");
-                        addError(req, "Failed to cancel flow " + flowName + ".");
-                    }
-                } catch(Exception e) {
-                    logger.error("Exception while attempting to cancel flow '" + flowName + "'.", e);
-                    addError(req, "Failed to cancel flow " + flowName + ": " + e.getMessage());
-                }
+        String job = getParam(req, "job");
+        String startTime = getParam(req, "start_time");
+        try {
+            if (app.getScheduler().cancel(job, startTime)) {
+                addMessage(req, "Cancelled " + job);
+                logger.info("Job ('" + job + "','" + startTime + "') cancelled from gui.");
+            } else {
+                logger.info("Couldn't cancel flow ('" + job + "','" + startTime + "')" + "' for some reason.");
+                addError(req, "Failed to cancel flow ('" + job + "','" + startTime + "')");
             }
+        } catch (Exception e) {
+            logger.error("Exception while attempting to cancel flow ('" + job + "','" + startTime + "')'", e);
+            addError(req, "Failed to cancel flow ('" + job + "','" + startTime + "'): " + e.getMessage());
         }
     }
 

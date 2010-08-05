@@ -501,20 +501,20 @@ public class Scheduler
     public boolean unschedule(String name, DateTime scheduledExecution)
     {
         Collection<ScheduledJob> scheduledJobs = _scheduled.get(name);
-        ScheduledJob job = null;
+        ScheduledJob jobToUnschedule = null;
         synchronized (scheduledJobs) {
             for (ScheduledJob scheduledJob : scheduledJobs) {
                 if (scheduledJob.getScheduledExecution().equals(scheduledExecution)) {
-                    job = scheduledJob;
+                    jobToUnschedule = scheduledJob;
                     break;
                 }
             }
         }
 
-        _scheduled.remove(name, job);
-        if (job != null) {
-            job.markInvalid();
-            Runnable runnable = job.getScheduledRunnable();
+        _scheduled.remove(name, jobToUnschedule);
+        if (jobToUnschedule != null) {
+            jobToUnschedule.markInvalid();
+            Runnable runnable = jobToUnschedule.getScheduledRunnable();
             _executor.remove(runnable);
         }
         try {
@@ -524,7 +524,36 @@ public class Scheduler
             throw new RuntimeException("Error saving schedule after unscheduling job " + name);
         }
 
-        return job != null;
+        return jobToUnschedule != null;
+    }
+
+    public boolean cancel(String name, String startTimeString) {
+        return cancel(name, startTimeString, ISODateTimeFormat.dateTime());
+    }
+
+    public boolean cancel(String name, String startTimeString, DateTimeFormatter f) {
+        DateTime startTime = f.parseDateTime(startTimeString);
+        return cancel(name, startTime);
+    }
+
+    public boolean cancel(String name, DateTime startTime) {
+        Collection<ScheduledJob> executingJobs = _executing.get(name);
+        ScheduledJob jobToCancel = null;
+        synchronized (executingJobs) {
+            for (ScheduledJob executingJob : executingJobs) {
+                if (executingJob.getStarted().equals(startTime)) {
+                    jobToCancel = executingJob;
+                    break;
+                }
+            }
+        }
+
+        if (jobToCancel != null) {
+            ExecutableFlow flow = jobToCancel.getExecutableFlow();
+            return (flow != null && flow.cancel());
+        } else {
+            return false;
+        }
     }
 
     /**
@@ -542,30 +571,6 @@ public class Scheduler
             return t;
         }
     }
-
-    /*
-    public class ScheduledJobAndInstance
-    {
-        private final ExecutableFlow flow;
-        private final ScheduledJob _scheduledJob;
-
-        private ScheduledJobAndInstance(ExecutableFlow flow, ScheduledJob scheduledJob)
-        {
-            this.flow = flow;
-            _scheduledJob = scheduledJob;
-        }
-
-        public ExecutableFlow getExecutableFlow()
-        {
-            return flow;
-        }
-
-        public ScheduledJob getScheduledJob()
-        {
-            return _scheduledJob;
-        }
-    }
-    */
 
     /**
      * A runnable adapter for a Job
