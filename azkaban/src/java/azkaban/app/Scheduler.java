@@ -156,7 +156,7 @@ public class Scheduler
         // name contains the job name and the time it's scheduled to run
         String[] namePieces = name.split("\\s+");
         String[] jobPieces = job.split("\\s+");
-        if (namePieces.length != 2 || jobPieces.length != 2) {
+        if (namePieces.length != 2 || jobPieces.length != 3) {
             logger.warn("Error loading schedule from file " + name);
             return null;
         }
@@ -165,12 +165,19 @@ public class Scheduler
         DateTime time = FILE_DATEFORMAT.parseDateTime(namePieces[1]);
         ReadablePeriod period = parsePeriodString(name, jobPieces[0]);
         Boolean dependency = Boolean.parseBoolean(jobPieces[1]);
+        Boolean recurImmediately = Boolean.parseBoolean(jobPieces[2]);
+
         if (dependency == null) {
             dependency = false;
         }
+
+        if (recurImmediately == null) {
+            recurImmediately = false;
+        }
+
         if (period == null) {
             if (time.isAfterNow()) {
-                return new ScheduledJob(jobname, time, period, dependency);
+                return new ScheduledJob(jobname, time, period, dependency, recurImmediately);
             }
             else {
                 logger.warn("Non recurring job scheduled in past. Will not reschedule " + name);
@@ -180,7 +187,7 @@ public class Scheduler
 
         // Update the time with the period.
         DateTime date = updatedTime(time, period);
-        return new ScheduledJob(jobname, date, period, dependency);
+        return new ScheduledJob(jobname, date, period, dependency, recurImmediately);
     }
 
     /**
@@ -192,7 +199,7 @@ public class Scheduler
     public ScheduledFuture<?> schedule(String jobId, DateTime date, boolean ignoreDep)
     {
         logger.info("Scheduling job '" + jobId + "' for " + _dateFormat.print(date));
-        return schedule(new ScheduledJob(jobId, _jobManager, date, ignoreDep), true);
+        return schedule(new ScheduledJob(jobId, _jobManager, date, ignoreDep, false), true);
     }
 
     /**
@@ -204,7 +211,7 @@ public class Scheduler
     {
         logger.info("Scheduling job '" + flow.getName() + "' for now");
 
-        final ScheduledJob schedJob = new ScheduledJob(flow.getName(), _jobManager, new DateTime(), true);
+        final ScheduledJob schedJob = new ScheduledJob(flow.getName(), _jobManager, new DateTime(), true, false);
         schedJob.setExecutableFlow(flow);
         
         // mark the job as scheduled
@@ -223,11 +230,11 @@ public class Scheduler
      * @param dateTime The date on which to first start the job
      * @param period   The period on which the job repeats
      */
-    public ScheduledFuture<?> schedule(String jobId, DateTime dateTime, ReadablePeriod period, boolean ignoreDep)
+    public ScheduledFuture<?> schedule(String jobId, DateTime dateTime, ReadablePeriod period, boolean ignoreDep, boolean recurImmediately)
     {
         logger.info("Scheduling job '" + jobId + "' for " + _dateFormat.print(dateTime) +
                     " with a period of " + PeriodFormat.getDefault().print(period));
-        return schedule(new ScheduledJob(jobId, dateTime, period, ignoreDep), true);
+        return schedule(new ScheduledJob(jobId, dateTime, period, ignoreDep, recurImmediately), true);
     }
 
     /**
@@ -239,7 +246,7 @@ public class Scheduler
      * @param partial A description of the date to run on
      * @param period  The period on which the job should repeat
      */
-    public ScheduledFuture<?> schedule(String jobId, ReadablePartial partial, ReadablePeriod period, boolean ignoreDep)
+    public ScheduledFuture<?> schedule(String jobId, ReadablePartial partial, ReadablePeriod period, boolean ignoreDep, boolean recurImmediately)
     {
         // compute the next occurrence of this date
         DateTime now = new DateTime();
@@ -260,7 +267,7 @@ public class Scheduler
 
         logger.info("Scheduling job '" + jobId + "' for " + _dateFormat.print(date) + (period != null ?
                                                                                        " with a period of " + PeriodFormat.getDefault().print(period) : ""));
-        return schedule(new ScheduledJob(jobId, date, period, ignoreDep), true);
+        return schedule(new ScheduledJob(jobId, date, period, ignoreDep, recurImmediately), true);
     }
 
     private ScheduledFuture<?> schedule(final ScheduledJob schedJob, boolean saveResults)
@@ -348,8 +355,9 @@ public class Scheduler
             String nextScheduledStr = time.toString(FILE_DATEFORMAT);
 
             String dependency = String.valueOf(job.isDependencyIgnored());
+            String recurImmediately = String.valueOf(job.doesRecurImmediately());
 
-            props.put(name + " " + nextScheduledStr, periodStr + " " + dependency);
+            props.put(name + " " + nextScheduledStr, periodStr + " " + dependency + " " + recurImmediately);
         }
 
         return props;
@@ -584,11 +592,13 @@ public class Scheduler
         private final ScheduledJob _scheduledJob;
         private final boolean _ignoreDep;
         private final boolean _restarted;
+        private final boolean _recurImmediately;
 
         private ScheduledRunnable(ScheduledJob schedJob)
         {
             this._scheduledJob = schedJob;
             this._ignoreDep = schedJob.isDependencyIgnored();
+            this._recurImmediately = schedJob.doesRecurImmediately();
             this._restarted = (schedJob.getExecutableFlow() != null) ? true : false;
         }
 
@@ -678,7 +688,8 @@ public class Scheduler
                                 schedule(_scheduledJob.getId(),
                                          nextRun,
                                          _scheduledJob.getPeriod(),
-                                         _ignoreDep);
+                                         _ignoreDep,
+                                         _recurImmediately);
                             }
                             else {
                                 try {

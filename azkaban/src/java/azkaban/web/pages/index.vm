@@ -156,8 +156,8 @@
               <option>pm</option>
               <option>am</option>
             </select>
-            and 
-            <input name="is_recurring" type="checkbox" checked  />
+            <ul style="margin-top:0">
+            <li><input name="is_recurring" type="checkbox" checked  />
             repeat every
             <input name="period" type="text" size="2" value="1"/>
             <select name="period_units">
@@ -165,7 +165,12 @@
               <option value="h">Hours</option>
               <option value="m">Minutes</option>
               <option value="s">Seconds</option>
-            </select>
+            </select></li>
+            <li>
+            <input name="recur_immediately" type="checkbox"/>
+            schedule recurring jobs immediately
+            </li>
+            </ul>
             <input type="submit" name="schedule" value="Schedule"/>
           </div>
         </div>

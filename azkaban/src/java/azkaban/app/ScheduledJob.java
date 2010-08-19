@@ -37,6 +37,7 @@ public class ScheduledJob {
     private final ReadablePeriod _period;
     private final DateTime _nextScheduledExecution;
     private final boolean _ignoreDependency;
+    private final boolean _recurImmediately;
     private volatile DateTime _started;
     private volatile DateTime _ended;
     private volatile boolean _invalid = false;
@@ -46,16 +47,19 @@ public class ScheduledJob {
     public ScheduledJob(String jobName,
                         JobManager jobManager,
                         DateTime nextExecution,
-                        boolean ignoreDependency) {
-        this(jobName, nextExecution, null, ignoreDependency);
+                        boolean ignoreDependency,
+                        boolean recurImmediately) {
+        this(jobName, nextExecution, null, ignoreDependency, recurImmediately);
     }
 
     public ScheduledJob(String jobName,
                         DateTime nextExecution,
                         ReadablePeriod period,
-                        boolean ignoreDependency) {
+                        boolean ignoreDependency,
+                        boolean recurImmediately) {
         super();
         _ignoreDependency = ignoreDependency;
+        _recurImmediately = recurImmediately;
         _jobName = Utils.nonNull(jobName);
         _period = period;
         _nextScheduledExecution = Utils.nonNull(nextExecution);
@@ -101,6 +105,10 @@ public class ScheduledJob {
 
     public boolean isDependencyIgnored() {
         return _ignoreDependency;
+    }
+
+    public boolean doesRecurImmediately() {
+        return _recurImmediately;
     }
 
     public void setScheduledRunnable(Runnable runnable) {

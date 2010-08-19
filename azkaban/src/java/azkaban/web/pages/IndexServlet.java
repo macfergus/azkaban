@@ -127,13 +127,16 @@ public class IndexServlet extends AbstractAzkabanServlet {
                 if(isPm && hour < 12)
                     hour += 12;
                 hour %= 24;
+                
+                boolean recurImmediately = hasParam(req, "recur_immediately");
 
                 app.getScheduler().schedule(job,
                                             new LocalDateTime().withHourOfDay(hour)
                                                                .withMinuteOfHour(minutes)
                                                                .withSecondOfMinute(0),
                                             thePeriod,
-                                            false);
+                                            false,
+                                            recurImmediately);
                 addMessage(req, job + " scheduled.");
             } else if(hasParam(req, "run_now")) {
                 boolean ignoreDeps = !hasParam(req, "include_deps");
