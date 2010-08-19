@@ -641,6 +641,16 @@ public class Scheduler
                     _scheduledJob.setExecutableFlow(flowToRun);
                 }
 
+                // Schedule the next job if it's recurring and recurs immediately.
+                if (_scheduledJob.isRecurring() && !_scheduledJob.isInvalid() && _recurImmediately) {
+                    DateTime nextRun = _scheduledJob.getScheduledExecution().plus(_scheduledJob.getPeriod());
+                    // This call will also save state.
+                    schedule(_scheduledJob.getId(),
+                             nextRun,
+                             _scheduledJob.getPeriod(),
+                             _ignoreDep,
+                             _recurImmediately);
+                }
 
                 // mark the job as executing
                 _scheduled.remove(_scheduledJob.getId(), _scheduledJob);
@@ -681,8 +691,8 @@ public class Scheduler
                             _executing.remove(_scheduledJob.getId(), _scheduledJob);
                             _completed.put(_scheduledJob.getId(), _scheduledJob);
 
-                            // if this is a recurring job, schedule the next execution as well
-                            if (_scheduledJob.isRecurring() && !_scheduledJob.isInvalid()) {
+                            // If this is a recurring job and it doesn't recur immediately, schedule the next execution as well
+                            if (_scheduledJob.isRecurring() && !_scheduledJob.isInvalid() && !_recurImmediately) {
                                 DateTime nextRun = _scheduledJob.getScheduledExecution().plus(_scheduledJob.getPeriod());
                                 // This call will also save state.
                                 schedule(_scheduledJob.getId(),
