@@ -27,6 +27,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import azkaban.common.utils.Props;
+
 /**
  *
  */
@@ -145,6 +147,11 @@ public class GroupedExecutableFlow implements ExecutableFlow
                 }).iterator(),
                 " + "
         );
+    }
+
+    @Override
+    public Props getOverrideProps() {
+        return flows[0].getOverrideProps();
     }
 
     @Override

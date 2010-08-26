@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+import azkaban.common.utils.Props;
+
 /**
  *
  */
@@ -101,6 +103,11 @@ public class ComposedExecutableFlow implements ExecutableFlow
     public String getName()
     {
         return depender.getName();
+    }
+
+    @Override
+    public Props getOverrideProps() {
+        return depender.getOverrideProps();
     }
 
     @Override

@@ -50,7 +50,7 @@ public class ExecutionHistoryServlet extends AbstractAzkabanServlet {
                     }
                     else {
                         Flows.resetFailedFlows(flow);
-                        this.getApplication().getScheduler().scheduleNow(flow);
+                        this.getApplication().getScheduler().restartFlow(flow);
 
                         addMessage(req, String.format("Flow[%s] restarted.", id));
                     }

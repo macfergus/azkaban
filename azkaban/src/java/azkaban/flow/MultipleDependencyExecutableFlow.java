@@ -20,6 +20,8 @@ import org.joda.time.DateTime;
 
 import java.util.List;
 
+import azkaban.common.utils.Props;
+
 /**
  *
  */
@@ -48,6 +50,11 @@ public class MultipleDependencyExecutableFlow implements ExecutableFlow
     public String getName()
     {
         return actualFlow.getName();
+    }
+
+    @Override
+    public Props getOverrideProps() {
+        return actualFlow.getOverrideProps();
     }
 
     @Override

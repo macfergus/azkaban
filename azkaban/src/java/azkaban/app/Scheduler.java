@@ -203,15 +203,28 @@ public class Scheduler
     }
 
     /**
-     * Schedule this flow to run one time now.
+     * Restart this flow to run now.
      *
      * @param flow The ExecutableFlow to run
      */
-    public ScheduledFuture<?> scheduleNow(ExecutableFlow flow)
+    public ScheduledFuture<?> restartFlow(ExecutableFlow flow)
     {
-        logger.info("Scheduling job '" + flow.getName() + "' for now");
+        logger.info("Scheduling job (" + flow.getName() + "," + flow.getId() + ") for now");
 
-        final ScheduledJob schedJob = new ScheduledJob(flow.getName(), _jobManager, new DateTime(), true, false);
+        String scheduledTimeString = flow.getOverrideProps().get("azkaban.flow.scheduled.timestamp");
+        DateTime now = new DateTime();
+        DateTime scheduledTime =
+            scheduledTimeString == null
+            ? now
+            : ISODateTimeFormat.dateTime().parseDateTime(scheduledTimeString);
+
+        Duration gap = new Duration(now, scheduledTime);
+        if (gap.getMillis() > 0) {
+            // scheduledTime is greater than now, which shouldn't be the case
+            throw new IllegalStateException("Scheduled time for restarted flow (" + flow.getName() + "," + flow.getId() + ") is after the current time. This shouldn't happen.");
+        }
+        
+        final ScheduledJob schedJob = new ScheduledJob(flow.getName(), _jobManager, scheduledTime, true, false);
         schedJob.setExecutableFlow(flow);
         
         // mark the job as scheduled
@@ -280,6 +293,7 @@ public class Scheduler
             logger.warn("Job " + schedJob.getId() + " is scheduled for " + DateTimeFormat.shortDateTime().print(schedJob.getScheduledExecution()) +
                         " which is " + (PeriodFormat.getDefault().print(wait.toPeriod())) + " in the past, adjusting scheduled date to now.");
             wait = new Duration(0);
+            // Update ScheduledJob executionTime
         }
 
         // mark the job as scheduled
@@ -632,7 +646,20 @@ public class Scheduler
                     flowToRun = _scheduledJob.getExecutableFlow();
                 } else {
                     // Get a new executable flow.
-                    flowToRun = allKnownFlows.createNewExecutableFlow(_scheduledJob.getId(), new Props());
+                    Props overrideProps = new Props();
+
+                    DateTime scheduledTime = _scheduledJob.getScheduledExecution();
+                    overrideProps.put("azkaban.flow.scheduled.timestamp", scheduledTime.toString());
+                    overrideProps.put("azkaban.flow.scheduled.year", scheduledTime.toString("yyyy"));
+                    overrideProps.put("azkaban.flow.scheduled.month", scheduledTime.toString("MM"));
+                    overrideProps.put("azkaban.flow.scheduled.day", scheduledTime.toString("dd"));
+                    overrideProps.put("azkaban.flow.scheduled.hour", scheduledTime.toString("HH"));
+                    overrideProps.put("azkaban.flow.scheduled.minute", scheduledTime.toString("mm"));
+                    overrideProps.put("azkaban.flow.scheduled.seconds", scheduledTime.toString("ss"));
+                    overrideProps.put("azkaban.flow.scheduled.milliseconds", scheduledTime.toString("SSS"));
+                    overrideProps.put("azkaban.flow.scheduled.timezone", scheduledTime.toString("ZZZZ"));
+                    
+                    flowToRun = allKnownFlows.createNewExecutableFlow(_scheduledJob.getId(), overrideProps);
                     if (_ignoreDep) {
                         for (ExecutableFlow subFlow : flowToRun.getChildren()) {
                             subFlow.markCompleted();

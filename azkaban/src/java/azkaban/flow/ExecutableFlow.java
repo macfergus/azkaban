@@ -20,6 +20,8 @@ import org.joda.time.DateTime;
 
 import java.util.List;
 
+import azkaban.common.utils.Props;
+
 /**
  * An ExecutableFlow is a Flow object that has both the graph structure data as well as state required to execute the
  * Flow.  While both an ExecutableFlow and a Flow are immutable from the API's perspective, an instance of an
@@ -122,4 +124,13 @@ public interface ExecutableFlow
      * @return an exception if the Flow has failed, null otherwise
      */
     public Throwable getException();
+
+
+    /**
+     * Gets this ExecutableFlow's override properties object.
+     *
+     * @return override properties
+     */
+    public Props getOverrideProps();
+
 }
