@@ -99,6 +99,7 @@
         <tr>
           <th>Name</th>
           <th>Start Time</th>
+          <th>Scheduled Time</th>
           <th>Period</th>
           <th></th>
         </tr>
@@ -114,6 +115,15 @@
               $utils.formatDateTime($exec.executableFlow.startTime)
               <br/>
               ($utils.formatPeriod($utils.period($exec.executableFlow.startTime, $util.now)) ago)
+            </td>
+            <td>
+              $utils.formatDateTime($exec.scheduledExecution)
+              <br/>
+              ($utils.formatPeriod($utils.period($exec.scheduledExecution, $util.now)) ago)
+              #if($exec.restarted)
+              <br/>
+              (RESTARTED)
+              #end
             </td>
             <td>
               #if($exec.scheduledJob.period)
