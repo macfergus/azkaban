@@ -226,6 +226,7 @@ public class Scheduler
         
         final ScheduledJob schedJob = new ScheduledJob(flow.getName(), _jobManager, scheduledTime, true, false);
         schedJob.setExecutableFlow(flow);
+        schedJob.markRestarted();
         
         // mark the job as scheduled
         _scheduled.put(schedJob.getId(), schedJob);
@@ -613,7 +614,7 @@ public class Scheduler
             this._scheduledJob = schedJob;
             this._ignoreDep = schedJob.isDependencyIgnored();
             this._recurImmediately = schedJob.doesRecurImmediately();
-            this._restarted = (schedJob.getExecutableFlow() != null) ? true : false;
+            this._restarted = schedJob.isRestarted();
         }
 
         public void run()

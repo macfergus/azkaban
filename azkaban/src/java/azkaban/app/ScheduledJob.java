@@ -41,6 +41,7 @@ public class ScheduledJob {
     private volatile DateTime _started;
     private volatile DateTime _ended;
     private volatile boolean _invalid = false;
+    private volatile boolean _restarted = false;
     private volatile Runnable _runnable = null;
     private volatile ExecutableFlow _flow = null;
 
@@ -133,6 +134,14 @@ public class ScheduledJob {
 
     public boolean isInvalid() {
         return _invalid;
+    }
+
+    public void markRestarted() {
+        _restarted = true;
+    }
+    
+    public boolean isRestarted() {
+        return _restarted;
     }
 
     @Override
