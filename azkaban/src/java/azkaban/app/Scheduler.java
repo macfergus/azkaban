@@ -166,20 +166,30 @@ public class Scheduler
                 // Ignore.
             }
         }
-
-        JSONObject scheduleJSON = null;
+        
         if (scheduleStr.charAt(0) != '{') {
-            // scheduleJSON = convertSchedulePropsToJSON(scheduleStr);
+            logger.info("The schedule file isn't serialized using JSON. Loading using properties instead and converting it to JSON.");
+            propsToSchedule(scheduleFile);
+            try {
+                saveSchedule();
+            } catch (IOException e) {
+                throw new RuntimeException("Error saving schedule after loading schedule from props.");
+            }
+            logger.info("Successfully read the schedule file using properties and converted it to JSON.");
         } else {
+            JSONObject scheduleJSON = null;
             try {
                 scheduleJSON = new JSONObject(scheduleStr);
             } catch (JSONException e) {
                 throw new RuntimeException("Error reading JSON from the schedule file at path " + scheduleFile.getAbsolutePath() + ".");
             }
+            JSONToSchedule(scheduleJSON);
         }
-        JSONToSchedule(scheduleJSON);
     }
 
+    /**
+     * Schedules jobs from a schedule JSON object.
+     */
     private void JSONToSchedule(JSONObject scheduleJSON) {
         Map<String, Object> scheduleMap = (new JSONToJava()).apply(scheduleJSON);
         
@@ -190,6 +200,10 @@ public class Scheduler
                 Verifier.verifyKeysExist(schedJob, "nextScheduled", "period", "ignoreDeps", "recurImmediately");
                 DateTime nextScheduled = FILE_DATEFORMAT.parseDateTime((String)schedJob.get("nextScheduled"));
                 ReadablePeriod period = parsePeriodString(jobName, (String)schedJob.get("period"));
+                if (period == null && !nextScheduled.isAfterNow()) {
+                    logger.warn("Non recurring job scheduled in past. Will not reschedule (" + jobName + "," + nextScheduled + ")");
+                    continue;
+                }
                 Boolean ignoreDeps = Boolean.parseBoolean((String)schedJob.get("ignoreDeps"));
                 Boolean recurImmediately = Boolean.parseBoolean((String)schedJob.get("recurImmediately"));
 
@@ -197,6 +211,57 @@ public class Scheduler
                 schedule(toSchedule, false);
             }
         }
+    }
+
+    /**
+     * Schedules jobs in a schedule properties file.
+     *
+     * This should only be called when upgrading Azkaban from a version that serializes
+     * the schedule using properties seen in 0.4 to a version that serializes the 
+     * schedule using JSON
+     */
+    private void propsToSchedule(File schedulefile) {
+        Props schedule = null;
+        try {
+            schedule = new Props(null, schedulefile.getAbsolutePath());
+        }
+        catch (Exception e) {
+            throw new RuntimeException("Error loading schedule from " + schedulefile);
+        }
+        
+        for (String key : schedule.keySet()) {
+            ScheduledJob job = parseScheduledJobProps(key, schedule.get(key));
+            if (job != null) {
+                this.schedule(job, false);
+            }
+        }
+    }
+
+    /**
+     * Parse scheduled job properties as they're serialized in Azkaban 0.4.
+     *
+     * This should only be called when upgrading. See propsToSchedule().
+     */
+    private ScheduledJob parseScheduledJobProps(String name, String job) {
+        String[] pieces = job.split("\\s+");
+
+        if (pieces.length != 3) {
+            logger.warn("Error loading schedule from file " + name);
+            return null;
+        }
+        
+        DateTime nextScheduled = FILE_DATEFORMAT.parseDateTime(pieces[0]);
+        ReadablePeriod period = parsePeriodString(name, pieces[1]);
+        Boolean ignoreDeps = Boolean.parseBoolean(pieces[2]);
+        if (ignoreDeps == null) {
+            ignoreDeps = false;
+        }
+
+        if (period == null && !nextScheduled.isAfterNow()) {
+            logger.warn("Non recurring job scheduled in past. Will not reschedule " + name);
+            return null;
+        }
+        return new ScheduledJob(name, nextScheduled, period, ignoreDeps, false);
     }
 
     /**
