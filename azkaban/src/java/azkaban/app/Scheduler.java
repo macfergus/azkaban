@@ -17,6 +17,13 @@
 package azkaban.app;
 
 import java.io.File;
+import java.io.BufferedOutputStream;
+import java.io.BufferedInputStream;
+import java.io.FileOutputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -25,7 +32,8 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.HashMap;
+import java.util.Set;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
@@ -33,6 +41,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.apache.log4j.Logger;
+import org.json.JSONObject;
+import org.json.JSONArray;
+import org.json.JSONException;
 import org.joda.time.DateTime;
 import org.joda.time.Days;
 import org.joda.time.Duration;
@@ -49,6 +60,8 @@ import org.joda.time.format.PeriodFormat;
 
 import azkaban.common.utils.Props;
 import azkaban.common.utils.Utils;
+import azkaban.util.JSONToJava;
+import azkaban.serialization.Verifier;
 import azkaban.flow.ExecutableFlow;
 import azkaban.flow.FlowCallback;
 import azkaban.flow.FlowManager;
@@ -133,61 +146,57 @@ public class Scheduler
         }
     }
 
-    private void loadFromFile(File schedulefile)
+    private void loadFromFile(File scheduleFile)
     {
-        Props schedule = null;
+        InputStream in = null;
+        byte[] buf = new byte[(int)scheduleFile.length()];
+        String scheduleStr = null;
         try {
-            schedule = new Props(null, schedulefile.getAbsolutePath());
-        }
-        catch (Exception e) {
-            throw new RuntimeException("Error loading schedule from " + schedulefile);
-        }
-
-        for (String key : schedule.keySet()) {
-            ScheduledJob job = parseScheduledJob(key, schedule.get(key));
-            if (job != null) {
-                this.schedule(job, false);
+            in = new BufferedInputStream(new FileInputStream(scheduleFile.getAbsolutePath()));
+            in.read(buf);
+            scheduleStr = new String(buf);
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException("Trying to load schedule file at path " + scheduleFile.getAbsolutePath() + ", which does not exist.");
+        } catch (IOException e) {
+            throw new RuntimeException("Error reading schedule from file at path " + scheduleFile.getAbsolutePath() + ".");
+        } finally {
+            try {
+                in.close();
+            } catch (IOException e) {
+                // Ignore.
             }
         }
+
+        JSONObject scheduleJSON = null;
+        if (scheduleStr.charAt(0) != '{') {
+            // scheduleJSON = convertSchedulePropsToJSON(scheduleStr);
+        } else {
+            try {
+                scheduleJSON = new JSONObject(scheduleStr);
+            } catch (JSONException e) {
+                throw new RuntimeException("Error reading JSON from the schedule file at path " + scheduleFile.getAbsolutePath() + ".");
+            }
+        }
+        JSONToSchedule(scheduleJSON);
     }
 
-    private ScheduledJob parseScheduledJob(String name, String job)
-    {
-        // name contains the job name and the time it's scheduled to run
-        String[] namePieces = name.split("\\s+");
-        String[] jobPieces = job.split("\\s+");
-        if (namePieces.length != 2 || jobPieces.length != 3) {
-            logger.warn("Error loading schedule from file " + name);
-            return null;
-        }
+    private void JSONToSchedule(JSONObject scheduleJSON) {
+        Map<String, Object> scheduleMap = (new JSONToJava()).apply(scheduleJSON);
+        
+        for (String jobName : scheduleMap.keySet()) {
+            ArrayList<Object> schedJobs = (ArrayList<Object>) scheduleMap.get(jobName);
+            for (Object schedJobObject : schedJobs) {
+                Map<String, Object> schedJob = (Map<String, Object>) schedJobObject;
+                Verifier.verifyKeysExist(schedJob, "nextScheduled", "period", "ignoreDeps", "recurImmediately");
+                DateTime nextScheduled = FILE_DATEFORMAT.parseDateTime((String)schedJob.get("nextScheduled"));
+                ReadablePeriod period = parsePeriodString(jobName, (String)schedJob.get("period"));
+                Boolean ignoreDeps = Boolean.parseBoolean((String)schedJob.get("ignoreDeps"));
+                Boolean recurImmediately = Boolean.parseBoolean((String)schedJob.get("recurImmediately"));
 
-        String jobname = namePieces[0];
-        DateTime time = FILE_DATEFORMAT.parseDateTime(namePieces[1]);
-        ReadablePeriod period = parsePeriodString(name, jobPieces[0]);
-        Boolean dependency = Boolean.parseBoolean(jobPieces[1]);
-        Boolean recurImmediately = Boolean.parseBoolean(jobPieces[2]);
-
-        if (dependency == null) {
-            dependency = false;
-        }
-
-        if (recurImmediately == null) {
-            recurImmediately = false;
-        }
-
-        if (period == null) {
-            if (time.isAfterNow()) {
-                return new ScheduledJob(jobname, time, period, dependency, recurImmediately);
-            }
-            else {
-                logger.warn("Non recurring job scheduled in past. Will not reschedule " + name);
-                return null;
+                ScheduledJob toSchedule = new ScheduledJob(jobName, nextScheduled, period, ignoreDeps, recurImmediately);
+                schedule(toSchedule, false);
             }
         }
-
-        // Update the time with the period.
-        DateTime date = updatedTime(time, period);
-        return new ScheduledJob(jobname, date, period, dependency, recurImmediately);
     }
 
     /**
@@ -351,31 +360,57 @@ public class Scheduler
                 _scheduleFile.renameTo(_scheduleBackupFile);
             }
 
-            Props prop = createScheduleProps();
-            // Create the new schedule file
-
-            prop.storeLocal(_scheduleFile);
+            BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(_scheduleFile));
+            try {
+                JSONObject schedule = scheduleToJSON();
+                out.write(schedule.toString().getBytes());
+            } catch (JSONException e) {
+                throw new IOException("There was an error converting the schedule to JSON.");
+            } finally {
+                out.close();
+            }
         }
     }
 
-    private Props createScheduleProps()
-    {
-        Props props = new Props();
-        for (ScheduledJob job : _scheduled.values()) {
-            String name = job.getId();
-            ReadablePeriod period = job.getPeriod();
-            String periodStr = createPeriodString(period);
+    /**
+     * Converts a job schedule to JSON like so:
+     *
+     * {
+     *   "myjob": [{"period": "...", "nextScheduled": "...", "ignoreDeps": true/false, "recurImmediately": true/false},
+     *             {"period": "...", "nextScheduled": "...", "ignoreDeps": true/false, "recurImmediately": true/false}]
+     *   
+     *   "anotherjob": [{"period": "...", "nextScheduled": "...", "ignoreDeps": true/false, "recurImmediately": true/false},
+     *                  {"period": "...", "nextScheduled": "...", "ignoreDeps": true/false, "recurImmediately": true/false},
+     *                  {"period": "...", "nextScheduled": "...", "ignoreDeps": true/false, "recurImmediately": true/false}]
+     *   ...
+     * }
+     */
+    private JSONObject scheduleToJSON() throws JSONException {
+        JSONObject schedule = new JSONObject();
+        Set<String> jobNames = _scheduled.keySet();
 
-            DateTime time = job.getScheduledExecution();
-            String nextScheduledStr = time.toString(FILE_DATEFORMAT);
+        synchronized (_scheduled) {
+            for (String jobName : jobNames) {
+                JSONArray jobs = new JSONArray();
 
-            String dependency = String.valueOf(job.isDependencyIgnored());
-            String recurImmediately = String.valueOf(job.doesRecurImmediately());
+                Collection<ScheduledJob> schedJobs = _scheduled.get(jobName);
+                for (ScheduledJob schedJob : schedJobs) {
+                    String periodStr = createPeriodString(schedJob.getPeriod());
+                    String nextScheduledStr = schedJob.getScheduledExecution().toString(FILE_DATEFORMAT);
 
-            props.put(name + " " + nextScheduledStr, periodStr + " " + dependency + " " + recurImmediately);
+                    JSONObject properties = new JSONObject();
+                    properties.put("period", periodStr);
+                    properties.put("nextScheduled", nextScheduledStr);
+                    properties.put("ignoreDeps", schedJob.isDependencyIgnored());
+                    properties.put("recurImmediately", schedJob.doesRecurImmediately());
+                    jobs.put(properties);
+                }
+
+                schedule.put(jobName, jobs);
+            }
         }
 
-        return props;
+        return schedule;
     }
 
     private ReadablePeriod parsePeriodString(String jobname, String periodStr)
