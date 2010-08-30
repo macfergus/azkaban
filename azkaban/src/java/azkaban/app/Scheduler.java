@@ -258,7 +258,7 @@ public class Scheduler
         }
 
         if (period == null && !nextScheduled.isAfterNow()) {
-            logger.warn("Non recurring job scheduled in past. Will not reschedule " + name);
+            logger.warn("Non recurring job scheduled in past. Will not reschedule (" + name + "," + period.toString() + ")");
             return null;
         }
         return new ScheduledJob(name, nextScheduled, period, ignoreDeps, false);
