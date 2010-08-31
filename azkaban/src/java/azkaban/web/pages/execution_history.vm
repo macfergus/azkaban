@@ -38,6 +38,7 @@
           <tr>
             <th>Id</th>
             <th>Name</th>
+            <th>Scheduled</th>
             <th>Started</th>
             <th>Ended</th>
             <th>Elapsed</th>
@@ -45,33 +46,40 @@
             <th>Log</th>
             <th>Restart</th>
           </tr>
-          #foreach($flow in $executions)
+          #foreach($exec in $executions)
             <tr>
-              <td>$flow.id</td>
-              <td><ul id="sched-tree">#history_execing_job($flow)</ul></td>
+              <td>$exec.flow.id</td>
+              <td><ul id="sched-tree">#history_execing_job($exec.flow)</ul></td>
               <td>
-                #if($utils.isNull($flow.started))
+              #if($utils.isNull($exec.scheduledTime))
+                &ndash
+              #else
+                $utils.formatDateTime($exec.scheduledTime)
+              #end
+              </td>
+              <td>
+                #if($utils.isNull($exec.flow.startTime))
                   &ndash;
                 #else
-                  $utils.formatDateTime($flow.started)
+                  $utils.formatDateTime($exec.flow.startTime)
                 #end
               </td>
               <td>
-                #if($utils.isNull($flow.ended))
+                #if($utils.isNull($exec.flow.endTime))
                   &ndash; 
                 #else
-                  $utils.formatDateTime($flow.ended)
+                  $utils.formatDateTime($exec.flow.endTime)
                 #end
               </td>
               <td>
-                #if($utils.isNull($flow.ended))
+                #if($utils.isNull($exec.flow.ended))
                   &ndash;
                 #else
-                  $utils.formatPeriod($utils.period($flow.started, $flow.ended))
+                  $utils.formatPeriod($utils.period($exec.flow.startTime, $exec.flow.startTime))
                 #end
               </td>
               <td>
-                $flow.status
+                $exec.flow.status
               </td>
               <td>
                 <a href="${context}/logs?file=${exec.id}">
@@ -79,7 +87,7 @@
                 </a>
               </td>
               <td>
-                <a href="${context}/history?action=restart&id=${flow.id}">restart</a>
+                <a href="${context}/history?action=restart&id=${exec.flow.id}">restart</a>
               </td>
             </tr>
           #end

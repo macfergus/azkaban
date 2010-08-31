@@ -22,6 +22,9 @@ import azkaban.flow.FlowManager;
 import azkaban.flow.Flows;
 import azkaban.web.AbstractAzkabanServlet;
 
+import org.joda.time.DateTime;
+import org.joda.time.format.ISODateTimeFormat;
+
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -68,12 +71,18 @@ public class ExecutionHistoryServlet extends AbstractAzkabanServlet {
         if(sizeParam != null)
             size = Integer.parseInt(sizeParam);
 
-        List<ExecutableFlow> execs = new ArrayList<ExecutableFlow>(size);
+        List<FlowAndScheduledTime> execs = new ArrayList<FlowAndScheduledTime>(size);
         for (int i = 0; i < size; ++i) {
             ExecutableFlow flow = allFlows.loadExecutableFlow(currMaxId - i);
-
+            
             if (flow != null) {
-                execs.add(flow);
+                String scheduledTimeString = flow.getOverrideProps().get("azkaban.flow.scheduled.timestamp");
+                DateTime scheduledTime = null;
+                if (scheduledTimeString != null) {
+                    scheduledTime = ISODateTimeFormat.dateTime().parseDateTime(scheduledTimeString);
+                }
+                FlowAndScheduledTime flowAndScheduledTime = new FlowAndScheduledTime(flow, scheduledTime);
+                execs.add(flowAndScheduledTime);
             }
         }
 
@@ -82,4 +91,23 @@ public class ExecutionHistoryServlet extends AbstractAzkabanServlet {
         page.render();
     }
 
+    public class FlowAndScheduledTime {
+        private final ExecutableFlow _flow;
+        private final DateTime _scheduledTime;
+
+        public FlowAndScheduledTime(ExecutableFlow flow, DateTime scheduledTime) {
+            _flow = flow;
+            _scheduledTime = scheduledTime;
+        }
+
+        public ExecutableFlow getFlow() {
+            return _flow;
+        }
+
+        public DateTime getScheduledTime() {
+            return _scheduledTime;
+        }
+    }
+
 }
+
