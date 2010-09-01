@@ -52,6 +52,18 @@
     <link rel="stylesheet" type="text/css" href="${context}/static/css/azkaban-common.css"/>
     <link rel="stylesheet" type="text/css" href="${context}/static/css/job_controller.css"/>
     <script src="${context}/static/js/job_controller.js" type="text/javascript"></script>
+
+    <script>
+      $(document).ready(function() {
+        $("#is_recurring").click(function() {
+          if ($("#is_recurring").is(":checked")) {
+            $("#recur_immediately").show();
+          } else {
+            $("#recur_immediately").hide();
+          }
+        });
+      });
+    </script>
   </head>
   <body>
   #appnamebox()    
@@ -167,7 +179,7 @@
               <option>am</option>
             </select>
             <ul style="margin-top:0">
-            <li><input name="is_recurring" type="checkbox" checked  />
+            <li><input id="is_recurring" name="is_recurring" type="checkbox" checked  />
             repeat every
             <input name="period" type="text" size="2" value="1"/>
             <select name="period_units">
@@ -176,8 +188,8 @@
               <option value="m">Minutes</option>
               <option value="s">Seconds</option>
             </select></li>
-            <li>
-            <input name="recur_immediately" type="checkbox"/>
+            <li id="recur_immediately">
+            <input name="recur_immediately" type="checkbox" />
             schedule recurring jobs immediately
             </li>
             </ul>
