@@ -71,7 +71,7 @@
                 #end
               </td>
               <td>
-                #if($utils.isNull($exec.flow.ended))
+                #if($utils.isNull($exec.flow.endTime))
                   &ndash;
                 #else
                   $utils.formatPeriod($utils.period($exec.flow.startTime, $exec.flow.startTime))
