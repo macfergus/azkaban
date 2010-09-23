@@ -60,13 +60,17 @@
 
     <script>
 
+      function getNumImmediateScheduledJobs() {
+        
+      };
+
       $(document).ready(function() {
 	    // Only allow recur immediately to be an option if the job is recurring.
         $("#is_recurring").click(function() {
           if ($("#is_recurring").is(":checked")) {
-            $("#recur_immediately").show("fast");
+            $("#recur_immediately_li").show("fast");
           } else {
-            $("#recur_immediately").hide("fast");
+            $("#recur_immediately_li").hide("fast");
           }
         });
 
@@ -74,6 +78,56 @@
 		var currDate = new Date();
 		$("#date").datepicker();
 		$("#date").val(currDate.format("mm/dd/yyyy"));
+
+        // Add a warning in case Azkaban will kick off too many jobs...
+        $("#schedule_form").submit(function () {
+          if (!($("#is_recurring").is(":checked") && 
+                $("#recur_immediately_checkbox").is(":checked"))) {return true; }
+
+          var hour = parseInt($("#hour").val(), 10);
+          var minutes = parseInt($("#minutes").val(), 10);
+          var date = $("#date").val();
+          var dateSplit = date.split("/");
+          var month = parseInt(dateSplit[0], 10);
+          var day = parseInt(dateSplit[1], 10);
+          var year = parseInt(dateSplit[2], 10);
+
+          // Get difference between the current time and the specified time.         
+          var currTime = new Date();
+          var specifiedTime = new Date(year, month - 1, day, hour, minutes, 0, 0);
+          var diff = currTime.valueOf() - specifiedTime.valueOf();
+
+          // Get the period
+          var periodUnits = $("#period_units").val();
+          var factor = null;
+
+          switch(periodUnits) {
+            case "d":
+              factor = 86400000;
+              break;
+            case "h":
+              factor = 3600000;
+              break;
+            case "m":
+              factor = 60000;
+              break;
+            case "s":
+              factor = 1000;
+              break;
+            default:
+              alert("Units must be one of 'Days', 'Hours', 'Minutes', or 'Seconds'.");
+              return false;
+          }
+
+          var period = parseInt($("#period").val(), 10);
+          var numJobs = Math.ceil(diff / (parseInt($("#period").val(), 10) * factor));
+          console.log("numJobs: " + numJobs);
+          if (numJobs <= 5) { return true; } // We're fine with kicking off up to 5 jobs immediately.
+
+          var shouldSchedule = confirm("This will kick off " + numJobs + " jobs immediately. Proceed?");
+          if (shouldSchedule) { return true; }
+          else { return false; }
+        });
       });
     </script>
   </head>
@@ -174,7 +228,7 @@
       
     <h2>All Jobs</h2>
     <div class="all-jobs">
-      <form method="post" action="${context}/">
+      <form id="schedule_form" method="post" action="${context}/">
         <div class="sched-form">
           <div>
             Run immediately
@@ -184,9 +238,9 @@
           <div>
             <input type="hidden" name="action" value="schedule"/>
 			Schedule to run at
-            <input name="hour" type="text" size="2" value="12"/> :
-            <input name="minutes" type="text" size="2" value="00"/>
-            <select name="am_pm">
+            <input id="hour" name="hour" type="text" size="2" value="12"/> :
+            <input id="minutes" name="minutes" type="text" size="2" value="00"/>
+            <select id="am_pm" name="am_pm">
               <option>pm</option>
               <option>am</option>
             </select> on
@@ -194,15 +248,15 @@
             <ul style="margin-top:0">
             <li><input id="is_recurring" name="is_recurring" type="checkbox" checked  />
             repeat every
-            <input name="period" type="text" size="2" value="1"/>
-            <select name="period_units">
+            <input id="period" name="period" type="text" size="2" value="1"/>
+            <select id="period_units" name="period_units">
               <option value="d">Days</option>
               <option value="h">Hours</option>
               <option value="m">Minutes</option>
               <option value="s">Seconds</option>
             </select></li>
-            <li id="recur_immediately">
-            <input name="recur_immediately" type="checkbox" />
+            <li id="recur_immediately_li">
+            <input id="recur_immediately_checkbox" name="recur_immediately" type="checkbox" />
             schedule recurring jobs immediately
             </li>
             </ul>
