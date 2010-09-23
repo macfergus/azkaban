@@ -35,6 +35,7 @@ import org.joda.time.LocalDateTime;
 import org.joda.time.Minutes;
 import org.joda.time.ReadablePeriod;
 import org.joda.time.Seconds;
+import org.joda.time.format.DateTimeFormat;
 
 import azkaban.app.JobDescriptor;
 import azkaban.app.ScheduledJob;
@@ -116,24 +117,27 @@ public class IndexServlet extends AbstractAzkabanServlet {
         for(String job: jobNames) {
             if(hasParam(req, "schedule")) {
                 int hour = getIntParam(req, "hour");
-                int minutes = getIntParam(req, "minutes");
                 boolean isPm = getParam(req, "am_pm").equalsIgnoreCase("pm");
+                if(isPm && hour < 12)
+                    hour += 12;
+                hour %= 24;
+
+                int minutes = getIntParam(req, "minutes");
+                
+				String dateString = getParam(req, "date");
+				DateTime date = DateTimeFormat.forPattern("MM/dd/yyyy").parseDateTime(dateString)
+                                                                       .withHourOfDay(hour)
+                                                                       .withMinuteOfHour(minutes);
 
                 ReadablePeriod thePeriod = null;
                 if(hasParam(req, "is_recurring")) {
                     thePeriod = parsePeriod(req);
                 }
 
-                if(isPm && hour < 12)
-                    hour += 12;
-                hour %= 24;
-                
                 boolean recurImmediately = hasParam(req, "recur_immediately");
 
                 app.getScheduler().schedule(job,
-                                            new LocalDateTime().withHourOfDay(hour)
-                                                               .withMinuteOfHour(minutes)
-                                                               .withSecondOfMinute(0),
+                                            date,
                                             thePeriod,
                                             false,
                                             recurImmediately);
