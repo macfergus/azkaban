@@ -320,8 +320,9 @@ public class Scheduler
      */
     public ScheduledFuture<?> schedule(String jobId, DateTime dateTime, ReadablePeriod period, boolean ignoreDep, boolean recurImmediately)
     {
+        String periodStr = period == null ? null : PeriodFormat.getDefault().print(period);
         logger.info("Scheduling job '" + jobId + "' for " + _dateFormat.print(dateTime) +
-                    " with a period of " + PeriodFormat.getDefault().print(period));
+                    " with a period of " + periodStr);
         return schedule(new ScheduledJob(jobId, dateTime, period, ignoreDep, recurImmediately), true);
     }
 
