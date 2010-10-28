@@ -117,9 +117,6 @@ public class IndexServlet extends AbstractAzkabanServlet {
         for(String job: jobNames) {
             if(hasParam(req, "schedule")) {
                 int hour = getIntParam(req, "hour");
-                boolean isPm = getParam(req, "am_pm").equalsIgnoreCase("pm");
-                if(isPm && hour < 12)
-                    hour += 12;
                 hour %= 24;
 
                 int minutes = getIntParam(req, "minutes");

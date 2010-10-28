@@ -238,12 +238,8 @@
           <div>
             <input type="hidden" name="action" value="schedule"/>
 			Schedule to run at
-            <input id="hour" name="hour" type="text" size="2" value="12"/> :
-            <input id="minutes" name="minutes" type="text" size="2" value="00"/>
-            <select id="am_pm" name="am_pm">
-              <option>pm</option>
-              <option>am</option>
-            </select> on
+            <input id="hour" name="hour" type="text" size="2" value="00"/> :
+            <input id="minutes" name="minutes" type="text" size="2" value="00"/> on
 			<input id="date" name="date" type="text"></input>
             <ul style="margin-top:0">
             <li><input id="is_recurring" name="is_recurring" type="checkbox" checked  />
