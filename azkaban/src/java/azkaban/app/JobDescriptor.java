@@ -47,6 +47,8 @@ public class JobDescriptor {
     public static final String RETRY_BACKOFF = "retry.backoff";
     public static final String JOB_PERMITS = "job.permits";
     public static final String NOTIFY_EMAIL = "notify.emails";
+    public static final String SUCCESS_EMAIL = "success.emails";
+    public static final String FAILURE_EMAIL = "failure.emails";
 
     public static final Comparator<JobDescriptor> NAME_COMPARATOR = new Comparator<JobDescriptor>() {
 
@@ -68,7 +70,8 @@ public class JobDescriptor {
     private final List<String> _readResourceLocks;
     private final List<String> _writeResourceLocks;
     private final String _sourceEmailList;
-    private final List<String> _emailList;
+    private final List<String> _successEmailList;
+    private final List<String> _failureEmailList;
     private final String _jobType;
 
     public JobDescriptor(String id, String conicalPath, String fullpath, Props props, ClassLoader classLoader) {
@@ -102,7 +105,8 @@ public class JobDescriptor {
         Collections.sort(this._readResourceLocks);
         Collections.sort(this._writeResourceLocks);
 
-        this._emailList = props.getStringList(NOTIFY_EMAIL);
+        this._successEmailList = props.getStringList(SUCCESS_EMAIL);
+        this._failureEmailList = props.getStringList(FAILURE_EMAIL);
     }
 
     /**
@@ -178,8 +182,12 @@ public class JobDescriptor {
         return _writeResourceLocks;
     }
 
-    public List<String> getEmailNotificationList() {
-        return _emailList;
+    public List<String> getSuccessEmailNotificationList() {
+        return _successEmailList;
+    }
+
+    public List<String> getFailureEmailNotificationList() {
+        return _failureEmailList;
     }
 
     public String getJobType() {

@@ -720,12 +720,13 @@ public class Scheduler
 
         public void run()
         {
+            List<String> errorEmailList = null;
+            String errorSenderEmail = null;
+
             logger.info("Starting run of " + _scheduledJob.getId());
             if (_restarted) {
                 logger.info("This is a restart of flow with ID " + _scheduledJob.getExecutableFlow().getId());
             }
-            List<String> emailList = null;
-            String senderAddress = null;
             try {
                 if (_scheduledJob.isInvalid()) {
                     return;
@@ -736,12 +737,6 @@ public class Scheduler
                     ? _jobManager.getJobDescriptor(_scheduledJob.getId())
                     : _jobManager.loadJobDescriptors(null, null, _ignoreDep).get(_scheduledJob.getId());
 
-                emailList = desc.getEmailNotificationList();
-                final List<String> finalEmailList = emailList;
-
-                senderAddress = desc.getSenderEmail();
-                final String senderEmail = senderAddress;
-                
                 final ExecutableFlow flowToRun;
                 if (_restarted) {
                     // Already have an executable flow we're restarting.
@@ -785,6 +780,13 @@ public class Scheduler
                 _scheduled.remove(_scheduledJob.getId(), _scheduledJob);
                 _scheduledJob.setStarted(new DateTime());
                 _executing.put(_scheduledJob.getId(), _scheduledJob);
+
+                final String senderEmail = desc.getSenderEmail();
+                final List<String> successEmailList = desc.getSuccessEmailNotificationList();
+                final List<String> failureEmailList = desc.getFailureEmailNotificationList();
+                errorEmailList = failureEmailList;
+                errorSenderEmail = senderEmail;
+
                 flowToRun.execute(new FlowCallback()
                 {
                     @Override
@@ -800,15 +802,16 @@ public class Scheduler
 
                         try {
                             allKnownFlows.saveExecutableFlow(flowToRun);
+
                             switch (status) {
                                 case SUCCEEDED:
-                                    sendSuccessEmail(_scheduledJob, _scheduledJob.getExecutionDuration(), senderEmail, finalEmailList);
+                                    sendSuccessEmail(_scheduledJob, _scheduledJob.getExecutionDuration(), senderEmail, successEmailList);
                                     break;
                                 case FAILED:
-                                    sendErrorEmail(_scheduledJob, flowToRun.getException(), senderEmail, finalEmailList);
+                                    sendErrorEmail(_scheduledJob, flowToRun.getException(), senderEmail, failureEmailList);
                                     break;
                                 default:
-                                    sendErrorEmail(_scheduledJob, new RuntimeException(String.format("Got an unknown status[%s]", status)), senderEmail, finalEmailList);
+                                    sendErrorEmail(_scheduledJob, new RuntimeException(String.format("Got an unknown status[%s]", status)), senderEmail, failureEmailList);
                             }
                         }
                         catch (RuntimeException e) {
@@ -845,9 +848,7 @@ public class Scheduler
                 allKnownFlows.saveExecutableFlow(flowToRun);
             }
             catch (Throwable t) {
-                if (emailList != null) {
-                    sendErrorEmail(_scheduledJob, t, senderAddress, emailList);
-                }
+                sendErrorEmail(_scheduledJob, t, errorSenderEmail, errorEmailList);
                 _scheduled.remove(_scheduledJob.getId(), _scheduledJob);
                 _executing.remove(_scheduledJob.getId(), _scheduledJob);
                 logger.warn(String.format("An exception almost made it back to the ScheduledThreadPool from job[%s]", _scheduledJob), t);
